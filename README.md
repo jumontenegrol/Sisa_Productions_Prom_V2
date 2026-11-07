@@ -4,7 +4,7 @@ Web para administrar el cobro del servicio de fotografía escolar (grados 1101 a
 login de admin, carga de estudiantes vía Excel, edición de datos de pago y generación de
 comprobantes de pago en PDF.
 
-El portal nuevo de selección de fotografías vive en [`portal-fotos/`](./portal-fotos/). Es otra aplicación Vite y se desplegará como un sitio aparte, con URL independiente y el mismo proyecto Supabase. Su pantalla de estudiante es por ahora un prototipo; el acceso del editor y la carga real de fotos viven en esta aplicación separada.
+El portal nuevo de selección de fotografías vive en [`portal-fotos/`](./portal-fotos/). Es otra aplicación Vite y se desplegará como un sitio aparte, con URL independiente y el mismo proyecto Supabase. Incluye login unificado, acceso real de estudiantes por nombre y teléfono, selección guardada en Supabase y carga de fotos/configuración para editores.
 
 ## Stack
 
@@ -19,7 +19,9 @@ Este sitio se conecta al proyecto existente que ya tiene las tablas `estudiantes
 
 Las migraciones de fotos `202611060001` a `202611060004` ya se ejecutaron en Supabase. Crearon las tablas de campañas/fotos/selecciones, restringieron las tablas a los dos perfiles editor y añadieron permisos de editor a los buckets privados. No vuelvas a ejecutar `202611060002_secure_editor_access.sql`.
 
-Los buckets privados `student-originals` y `student-previews` deben existir en **Storage**. La campaña inicial usa planes ID 1 y 2; Plan 3 no entra al portal. La fecha límite de selección y la imagen central siguen pendientes.
+Los buckets privados `student-originals` y `student-previews` deben existir en **Storage**. La campaña inicial usa planes ID 1 y 2; Plan 3 no entra al portal. La campaña no tiene fecha de apertura y su fecha de cierre aparece precargada para el 17 de noviembre de 2026 a las 6:00 p. m. (Colombia). El arte central se carga desde el panel de editor.
+
+Para activar el acceso estudiantil, ejecuta `supabase/migrations/202611060005_student_portal.sql` y despliega `supabase/functions/student-login` con Supabase CLI. La guía paso a paso está en [`portal-fotos/README.md`](./portal-fotos/README.md).
 
 ## 2. Configurar el proyecto localmente
 

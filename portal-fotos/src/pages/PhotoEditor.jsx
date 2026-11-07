@@ -10,6 +10,13 @@ function extOf(file) {
   return ext === 'jpeg' ? 'jpg' : ext
 }
 
+function toLocalDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+  return date.toISOString().slice(0, 16)
+}
+
 async function previewFile(file) {
   const image = await createImageBitmap(file)
   const scale = Math.min(1, 1400 / Math.max(image.width, image.height))
@@ -32,6 +39,8 @@ export default function PhotoEditor() {
   const [photos, setPhotos] = useState([])
   const [folderFiles, setFolderFiles] = useState([])
   const [retabloFiles, setRetabloFiles] = useState([])
+  const [closesAt, setClosesAt] = useState('')
+  const [centerFile, setCenterFile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
@@ -41,11 +50,12 @@ export default function PhotoEditor() {
     async function load() {
       if (!supabase) { setError('Configura las variables de Supabase en portal-fotos/.env.'); setLoading(false); return }
       const [campaignResult, studentResult] = await Promise.all([
-        supabase.from('photo_campaigns').select('id,name,opens_at,closes_at').order('created_at', { ascending: false }).limit(1),
+        supabase.from('photo_campaigns').select('id,name,opens_at,closes_at,center_image_path').order('created_at', { ascending: false }).limit(1),
         supabase.from('estudiantes').select('id,nombre,grado,plan_id').in('plan_id', [1, 2]).order('nombre'),
       ])
       if (campaignResult.error || studentResult.error) setError(campaignResult.error?.message || studentResult.error?.message)
       setCampaign(campaignResult.data?.[0] || null)
+      setClosesAt(toLocalDateTime(campaignResult.data?.[0]?.closes_at || '2026-11-17T23:00:00.000Z'))
       setStudents(studentResult.data || [])
       setLoading(false)
     }
@@ -84,6 +94,36 @@ export default function PhotoEditor() {
 
   function byFilename(files) {
     return [...files].sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true, sensitivity: 'base' }))
+  }
+
+  async function saveCampaignSettings() {
+    if (!campaign) return
+    const closeDate = closesAt ? new Date(closesAt) : null
+    if (!closeDate || Number.isNaN(closeDate.getTime())) {
+      setError('Define una fecha y hora de cierre para la selección.')
+      return
+    }
+    setSaving(true); setError(''); setNotice('')
+    try {
+      let centerPath = campaign.center_image_path
+      if (centerFile) {
+        if (!centerFile.type.startsWith('image/') || centerFile.size > 10 * 1024 * 1024) throw new Error('El arte debe ser una imagen de máximo 10 MB.')
+        const preview = await previewFile(centerFile)
+        centerPath = `${campaign.id}/defaults/center.webp`
+        const { error: uploadError } = await supabase.storage.from('student-previews').upload(centerPath, preview.blob, { upsert: true, contentType: 'image/webp' })
+        if (uploadError) throw uploadError
+      }
+      const { data, error: updateError } = await supabase.from('photo_campaigns').update({
+        opens_at: null,
+        closes_at: closeDate?.toISOString() || null,
+        center_image_path: centerPath || null,
+      }).eq('id', campaign.id).select('id,name,opens_at,closes_at,center_image_path').single()
+      if (updateError) throw updateError
+      setCampaign(data); setCenterFile(null)
+      setNotice('Se guardaron las fechas y el arte central de la campaña.')
+    } catch (saveError) {
+      setError(`No se pudo guardar la configuración: ${saveError.message}`)
+    } finally { setSaving(false) }
   }
 
   async function uploadGroup(category, files, count) {
@@ -138,6 +178,7 @@ export default function PhotoEditor() {
   return <main className="editor-page">
     <header className="editor-topbar"><div className="editor-heading-brand"><BrandLogo variant="header" /><div><p className="overline">PORTAL INDEPENDIENTE</p><h1>Editor de fotografías</h1><p>Los planes se leen automáticamente desde la ficha existente del estudiante.</p></div></div><div className="top-actions"><Link to="/" className="outline-button">Inicio</Link><button className="outline-button" onClick={signOut}>Salir</button></div></header>
     {error && <div className="editor-alert error-alert">{error}</div>}{notice && <div className="editor-alert success-alert">{notice}</div>}
+    {campaign && <section className="campaign-settings"><div><p className="overline">CAMPAÑA ACTIVA</p><h2>Cierre y arte central</h2><p>La selección está abierta desde ahora y cierra el martes 17 de noviembre a las 6:00 p. m. (hora Colombia). El plan se toma automáticamente de la ficha del estudiante.</p></div><div className="campaign-settings-fields"><label>Fecha y hora de cierre<input type="datetime-local" value={closesAt} onChange={(event) => setClosesAt(event.target.value)} /></label><label>Imagen central de la carpeta<input type="file" accept="image/*" onChange={(event) => setCenterFile(event.target.files?.[0] || null)} /><small>{centerFile?.name || (campaign.center_image_path ? 'Ya hay una imagen central cargada.' : 'Opcional; puedes agregarla cuando tengas el arte.')}</small></label><button className="gold-button" disabled={saving} onClick={saveCampaignSettings}>{saving ? 'Guardando…' : 'Guardar configuración'}</button></div></section>}
     <div className="editor-layout"><aside className="editor-roster"><label>Filtrar por curso<select value={course} onChange={(event) => setCourse(event.target.value)}><option value="">Todos los cursos</option>{courses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Buscar por nombre<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre del estudiante" /></label><p className="roster-count">{filtered.length} estudiantes</p><div className="roster-list">{filtered.map((item) => <button key={item.id} className={`roster-item ${student?.id === item.id ? 'selected' : ''}`} onClick={() => selectStudent(item)}><b>{item.nombre}</b><span>{item.grado} · Plan {item.plan_id}</span></button>)}{!filtered.length && <p>No hay estudiantes con Plan 1 o Plan 2 en este curso.</p>}</div></aside>
       <section className="editor-workspace">{!student ? <div className="editor-empty"><h2>Selecciona un estudiante</h2><p>Plan 3 se excluye automáticamente. No necesitas asignar planes al cargar fotos.</p></div> : <>
         <div className="selected-student"><div><span>{student.grado} · Plan {student.plan_id}</span><h2>{student.nombre}</h2></div><div className="measure-list"><span>Carpeta · 20 × 30 cm vertical</span><span>Retablo · {student.plan_id === 1 ? '30 × 45' : '50 × 70'} cm vertical</span></div></div>

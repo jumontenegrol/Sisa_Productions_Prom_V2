@@ -6,5 +6,6 @@ import './editor.css'
 import './landing.css'
 import './typography.css'
 import './login-fix.css'
+import './student-live.css'
 
 createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>)

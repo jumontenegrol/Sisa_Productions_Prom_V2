@@ -1,0 +1,13 @@
+.photo-choice .real-photo{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:#25262b}
+.selected-preview-photo{display:block;width:100%;height:100%;object-fit:cover}
+.center-photo{display:block;width:100%;height:100%;object-fit:contain;background:#17181b}
+.deadline-banner{margin:12px 0;padding:12px 15px;border:1px solid #655838;background:#29251c;color:#dfd1ad;font-size:13px;line-height:1.5}
+.locked-banner{border-color:#594647;background:#281f20;color:#e2bcb7}
+.student-state-page{min-height:100vh;display:grid;place-items:center;padding:24px}
+.student-state-card{width:min(100%,520px);padding:32px;background:var(--panel);border:1px solid var(--line)}
+.student-state-card h1{font:500 28px 'Playfair Display',serif}
+.student-state-card p{font-size:14px;color:var(--muted);line-height:1.6}
+.student-real-main .photo-choice{background:#202126}
+@media(max-width:600px){.deadline-banner{font-size:11px;padding:10px}.student-state-card{padding:24px 18px}}
+.student-brand{width:160px;height:66px;overflow:hidden}
+@media(max-width:600px){.student-brand{width:140px;height:58px}}

@@ -122,6 +122,15 @@
   align-items: start;
   gap: 18px;
 }
+.campaign-settings { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); gap: 24px; margin: 0 0 18px; padding: 20px; border: 1px solid var(--line); background: #191a1f; }
+.campaign-settings h2 { margin: 0 0 7px; font: 500 22px/1.2 'Playfair Display', serif; color: #f4f0e8; }
+.campaign-settings p:not(.overline) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.campaign-settings-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+.campaign-settings-fields label { display: flex; flex-direction: column; gap: 7px; color: #dedbd3; font-size: 12px; }
+.campaign-settings-fields input { min-width: 0; padding: 10px; border: 1px solid #414248; background: #101114; color: #f4f0e8; font: inherit; }
+.campaign-settings-fields label:nth-child(3) { grid-column: 1 / 2; }
+.campaign-settings-fields small { color: var(--muted); font-size: 11px; }
+.campaign-settings-fields button { grid-column: 2; }
 .editor-roster,
 .editor-workspace {
   min-width: 0;
@@ -239,6 +248,9 @@
   .editor-topbar { align-items: flex-start; flex-direction: column; }
   .editor-heading-brand { align-items: flex-start; flex-direction: column; gap: 8px; }
   .editor-layout { grid-template-columns: 1fr; }
+  .campaign-settings { grid-template-columns: 1fr; gap: 15px; }
+  .campaign-settings-fields { grid-template-columns: 1fr; }
+  .campaign-settings-fields label:nth-child(3),.campaign-settings-fields button { grid-column: 1; }
   .editor-roster { position: static; }
   .roster-list { max-height: 270px; }
   .selected-student { align-items: flex-start; flex-direction: column; }
