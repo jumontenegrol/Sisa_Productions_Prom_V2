@@ -1,0 +1,38 @@
+/* Larger, more comfortable type across the portal */
+body{font-size:16px}
+.brand-logo{display:block;width:190px;height:56px;object-fit:contain;object-position:left center}
+.login-logo{width:235px;height:74px;margin-bottom:3px}
+.unified-login-card{gap:17px;padding:38px}
+.unified-login-card .overline{font-size:12px}
+.unified-login-card h1{font-size:35px}
+.unified-login-card>p:not(.overline){font-size:15px;line-height:1.55}
+.unified-login-card label{font-size:13px;gap:8px}
+.unified-login-card input{font-size:16px;padding:14px}
+.unified-login-card .gold-button{font-size:14px;padding:15px}
+.unified-login-card .login-help,.unified-login-card .demo-link{font-size:12px}
+.welcome-row h1{font-size:42px}
+.welcome-copy,.section-heading p{font-size:15px}
+.overline{font-size:11px}
+.plan-card small,.plan-card span{font-size:12px}
+.plan-card strong{font-size:19px}
+.step-nav b,.step-final b{font-size:13px}
+.step-nav small,.step-final small{font-size:11px}
+.section-heading h2{font-size:30px}
+.counter,.size-chip{font-size:15px}
+.counter small{font-size:12px}
+.photo-choice-caption{font-size:11px}
+.preview-card-heading strong{font-size:13px}
+.preview-card-heading span,.preview-caption,.layout-option small{font-size:11px}
+.layout-option b,.pool-heading{font-size:13px}
+.section-footer,.primary-button,.text-button{font-size:13px}
+.portal-footer{font-size:11px}
+.editor-login-card h1,.editor-topbar h1{font-size:33px}
+.editor-login-card>p:not(.overline),.editor-topbar>div>p:not(.overline){font-size:15px}
+.editor-login-card label,.editor-roster label{font-size:13px}
+.editor-login-card input,.editor-roster input{font-size:16px;padding:13px}
+.gold-button,.outline-button{font-size:13px}
+.roster-item b{font-size:13px}.roster-item span,.roster-list>p{font-size:11px}
+.selected-student>div:first-child>span,.measure-list,.upload-group-heading p,.editor-save-row p{font-size:12px}
+.selected-student h2{font-size:27px}.upload-group-heading h3{font-size:21px}.upload-group-heading strong{font-size:13px}
+.editor-thumb small,.select-files,.select-files small{font-size:10px}
+@media(max-width:600px){.brand-logo{width:145px;height:44px}.login-logo{width:215px;height:68px}.unified-login-card{padding:27px 21px}.unified-login-card h1{font-size:29px}.unified-login-card>p:not(.overline){font-size:14px}.unified-login-card label{font-size:12px}.welcome-row h1{font-size:34px}.welcome-copy,.section-heading p{font-size:12px}.section-heading h2{font-size:24px}.step-nav b,.step-final b{font-size:11px}.step-nav small,.step-final small{font-size:9px}.photo-choice-caption{font-size:8px}.section-footer,.primary-button,.text-button{font-size:11px}}

@@ -1,0 +1,20 @@
+/* Firm layout rules for the unified sign-in screen. */
+.unified-login-page{min-height:100vh;display:flex!important;align-items:center;justify-content:center;padding:32px 18px}
+.unified-login-card{display:flex!important;flex-direction:column!important;align-items:stretch;width:min(100%,560px);margin:0 auto;padding:42px;background:#191a1f;border:1px solid #393a41;gap:18px}
+.unified-login-card .brand-logo-crop{align-self:flex-start;margin-bottom:4px}
+.unified-login-card label{display:flex!important;flex-direction:column!important;align-items:stretch;width:100%;gap:8px;margin:0;font-size:14px;color:#dedbd3}
+.unified-login-card input{display:block;width:100%;min-width:0;padding:14px 15px;font-size:16px;background:#101114;border:1px solid #414248;color:#f4f0e8}
+.unified-login-card input:focus{outline:2px solid #bca76e;outline-offset:1px}
+.unified-login-card h1{font-size:36px;line-height:1.16;margin:0}
+.unified-login-card>p:not(.overline){font-size:16px;line-height:1.55;margin:0;color:#b4b4bb}
+.unified-login-card .gold-button{width:100%;min-height:50px;font-size:14px}
+.unified-login-card .login-help,.unified-login-card .demo-link{font-size:13px;line-height:1.5}
+.unified-login-card .inline-error{font-size:13px}
+.brand-logo-crop{position:relative;display:block;overflow:hidden;flex:0 0 auto}
+.brand-logo-crop img{position:absolute;display:block;max-width:none;object-fit:fill}
+.brand-logo-crop.logo-header{width:160px;height:66px}
+.brand-logo-crop.logo-header img{width:320px;height:320px;left:-77px;top:-102px}
+.brand-logo-crop.logo-login{width:300px;height:124px}
+.brand-logo-crop.logo-login img{width:600px;height:600px;left:-144px;top:-192px}
+.editor-heading-brand .brand-logo-crop{margin-right:4px}
+@media(max-width:600px){.unified-login-page{padding:18px 12px}.unified-login-card{padding:28px 22px;gap:16px}.unified-login-card h1{font-size:30px}.unified-login-card>p:not(.overline){font-size:14px}.brand-logo-crop.logo-login{width:270px;height:112px}.brand-logo-crop.logo-login img{width:540px;height:540px;left:-130px;top:-173px}.brand-logo-crop.logo-header{width:140px;height:58px}.brand-logo-crop.logo-header img{width:280px;height:280px;left:-67px;top:-95px}}
