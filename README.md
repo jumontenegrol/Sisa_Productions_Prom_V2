@@ -21,7 +21,7 @@ Las migraciones de fotos `202611060001` a `202611060004` ya se ejecutaron en Sup
 
 Los buckets privados `student-originals` y `student-previews` deben existir en **Storage**. La campaña inicial usa planes ID 1 y 2; Plan 3 no entra al portal. La campaña no tiene fecha de apertura y su fecha de cierre aparece precargada para el 17 de noviembre de 2026 a las 6:00 p. m. (Colombia). El arte central se carga desde el panel de editor.
 
-Para activar el acceso estudiantil, ejecuta `supabase/migrations/202611060005_student_portal.sql` y despliega `supabase/functions/student-login` con Supabase CLI. La guía paso a paso está en [`portal-fotos/README.md`](./portal-fotos/README.md).
+Para activar el acceso estudiantil, ejecuta `supabase/migrations/202611060005_student_portal.sql`, despliega `supabase/functions/student-login` y, para habilitar las descargas privadas de originales, ejecuta también `supabase/migrations/202611070001_student_original_downloads.sql`. La guía paso a paso está en [`portal-fotos/README.md`](./portal-fotos/README.md).
 
 ## 2. Configurar el proyecto localmente
 

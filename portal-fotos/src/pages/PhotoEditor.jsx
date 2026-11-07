@@ -17,6 +17,30 @@ function toLocalDateTime(value) {
   return date.toISOString().slice(0, 16)
 }
 
+function photoProgressFromRows(rows = []) {
+  const result = {}
+  for (const row of rows) {
+    const key = row.student_id
+    result[key] ||= { folder: 0, retablo: 0 }
+    if (row.category === 'folder') result[key].folder += 1
+    if (row.category === 'retablo') result[key].retablo += 1
+  }
+  return result
+}
+
+function csvCell(value) {
+  const text = String(value ?? '')
+  const safeText = /^[=+@\-\t\r]/.test(text) ? `'${text}` : text
+  return `"${safeText.replaceAll('"', '""')}"`
+}
+
+function photoPosition(selection) {
+  if (selection.product === 'folder') return selection.slot === 1 ? 'Cuadro izquierdo' : 'Cuadro derecho'
+  if (selection.layout === 1) return 'Centro'
+  if (selection.layout === 2) return selection.slot === 1 ? 'Mitad izquierda' : 'Mitad derecha'
+  return ['Superior izquierda', 'Superior derecha', 'Inferior izquierda', 'Inferior derecha'][selection.slot - 1] || `Espacio ${selection.slot}`
+}
+
 async function previewFile(file) {
   const image = await createImageBitmap(file)
   const scale = Math.min(1, 1400 / Math.max(image.width, image.height))
@@ -32,6 +56,7 @@ async function previewFile(file) {
 export default function PhotoEditor() {
   const { signOut } = useAuth()
   const [students, setStudents] = useState([])
+  const [photoProgress, setPhotoProgress] = useState({})
   const [campaign, setCampaign] = useState(null)
   const [student, setStudent] = useState(null)
   const [search, setSearch] = useState('')
@@ -43,6 +68,7 @@ export default function PhotoEditor() {
   const [centerFile, setCenterFile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [reporting, setReporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
 
@@ -57,6 +83,13 @@ export default function PhotoEditor() {
       setCampaign(campaignResult.data?.[0] || null)
       setClosesAt(toLocalDateTime(campaignResult.data?.[0]?.closes_at || '2026-11-17T23:00:00.000Z'))
       setStudents(studentResult.data || [])
+      if (campaignResult.data?.[0]) {
+        const { data: photoRows, error: photoRowsError } = await supabase.from('student_photos')
+          .select('student_id,category,ordinal')
+          .eq('campaign_id', campaignResult.data[0].id)
+        if (photoRowsError) setError(photoRowsError.message)
+        setPhotoProgress(photoProgressFromRows(photoRows || []))
+      }
       setLoading(false)
     }
     load()
@@ -68,7 +101,7 @@ export default function PhotoEditor() {
       setPhotos([])
       if (!student || !campaign) return
       const { data, error: queryError } = await supabase.from('student_photos')
-        .select('id,category,ordinal,original_path,preview_path,width_px,height_px')
+        .select('id,student_id,category,ordinal,original_path,preview_path,width_px,height_px')
         .eq('student_id', student.id).eq('campaign_id', campaign.id).order('ordinal')
       if (queryError) { if (active) setError(queryError.message); return }
       if (!data?.length) return
@@ -126,6 +159,52 @@ export default function PhotoEditor() {
     } finally { setSaving(false) }
   }
 
+  async function exportSelectionReport() {
+    if (!campaign) return
+    setReporting(true); setError(''); setNotice('')
+    try {
+      const [selectionResult, photoResult] = await Promise.all([
+        supabase.from('photo_selections').select('student_id,product,layout,slot,photo_id').eq('campaign_id', campaign.id),
+        supabase.from('student_photos').select('id,student_id,category,ordinal,original_path').eq('campaign_id', campaign.id),
+      ])
+      if (selectionResult.error) throw selectionResult.error
+      if (photoResult.error) throw photoResult.error
+      if (!selectionResult.data?.length) {
+        setNotice('Aún no hay selecciones guardadas para exportar.')
+        return
+      }
+      const studentById = new Map(students.map((item) => [item.id, item]))
+      const photoById = new Map((photoResult.data || []).map((item) => [item.id, item]))
+      const rows = selectionResult.data.map((selection) => {
+        const person = studentById.get(selection.student_id)
+        const photo = photoById.get(selection.photo_id)
+        if (!person || !photo) return null
+        const globalNumber = photo.category === 'folder' ? photo.ordinal : photo.ordinal + 5
+        const studentCode = `${String(person.grado || 'SINCURSO').replace(/[^a-z0-9]/gi, '')}-${String(person.id).padStart(4, '0')}`
+        const extension = photo.original_path?.split('.').pop()?.toLowerCase() || 'jpg'
+        const dimensions = selection.product === 'folder'
+          ? '20 x 30 cm vertical'
+          : selection.layout === 2
+            ? (person.plan_id === 1 ? '45 x 30 cm horizontal' : '70 x 50 cm horizontal')
+            : (person.plan_id === 1 ? '30 x 45 cm vertical' : '50 x 70 cm vertical')
+        const layoutName = selection.product === 'folder' ? 'Carpeta' : `Retablo opción ${selection.layout}`
+        const fileName = `${studentCode}-${String(globalNumber).padStart(2, '0')}.${extension}`
+        return [person.grado, person.id, person.nombre, person.plan_id, layoutName, dimensions, selection.slot, photoPosition(selection), `Foto ${String(globalNumber).padStart(2, '0')}`, fileName, photo.original_path]
+      }).filter(Boolean).sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es', { numeric: true }) || String(a[2]).localeCompare(String(b[2]), 'es') || String(a[4]).localeCompare(String(b[4]), 'es') || a[6] - b[6])
+      const header = ['Curso', 'ID estudiante', 'Estudiante', 'Plan', 'Producto / diseño', 'Tamaño', 'Posición', 'Ubicación', 'Foto', 'Nombre de archivo sugerido', 'Ruta del original en Storage']
+      const csv = '\uFEFF' + [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `selecciones-fotograficas-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setNotice(`Se exportaron ${rows.length} posiciones de foto en el informe CSV.`)
+    } catch (reportError) {
+      setError(`No se pudo generar el informe: ${reportError.message}`)
+    } finally { setReporting(false) }
+  }
+
   async function uploadGroup(category, files, count) {
     const ordered = byFilename(files)
     for (let i = 0; i < ordered.length; i += 1) {
@@ -164,10 +243,11 @@ export default function PhotoEditor() {
       await uploadGroup('retablo', retabloFiles, 10)
       setNotice(`Se guardaron las 15 fotos de ${student.nombre}. El plan ${student.plan_id} se tomó automáticamente de la base de datos.`)
       setFolderFiles([]); setRetabloFiles([])
-      const { data } = await supabase.from('student_photos').select('id,category,ordinal,original_path,preview_path,width_px,height_px').eq('student_id', student.id).eq('campaign_id', campaign.id).order('ordinal')
+      const { data } = await supabase.from('student_photos').select('id,student_id,category,ordinal,original_path,preview_path,width_px,height_px').eq('student_id', student.id).eq('campaign_id', campaign.id).order('ordinal')
       if (data?.length) {
         const { data: signed } = await supabase.storage.from('student-previews').createSignedUrls(data.map((item) => item.preview_path), 1800)
         setPhotos(data.map((item, index) => ({ ...item, signedUrl: signed?.[index]?.signedUrl || '' })))
+        setPhotoProgress((current) => ({ ...current, [student.id]: photoProgressFromRows(data)[student.id] || { folder: 0, retablo: 0 } }))
       }
     } catch (saveError) {
       setError(`Carga incompleta: ${saveError.message}. Puedes volver a guardar; los archivos se actualizan por posición.`)
@@ -176,10 +256,10 @@ export default function PhotoEditor() {
 
   if (loading) return <div className="center-msg">Cargando…</div>
   return <main className="editor-page">
-    <header className="editor-topbar"><div className="editor-heading-brand"><BrandLogo variant="header" /><div><p className="overline">PORTAL INDEPENDIENTE</p><h1>Editor de fotografías</h1><p>Los planes se leen automáticamente desde la ficha existente del estudiante.</p></div></div><div className="top-actions"><Link to="/" className="outline-button">Inicio</Link><button className="outline-button" onClick={signOut}>Salir</button></div></header>
+    <header className="editor-topbar"><div className="editor-heading-brand"><BrandLogo variant="header" /><div><p className="overline">PORTAL INDEPENDIENTE</p><h1>Editor de fotografías</h1><p>Los planes se leen automáticamente desde la ficha existente del estudiante.</p></div></div><div className="top-actions"><button className="outline-button" disabled={!campaign || reporting} onClick={exportSelectionReport}>{reporting ? 'Generando informe…' : 'Descargar informe CSV'}</button><Link to="/" className="outline-button">Inicio</Link><button className="outline-button" onClick={signOut}>Salir</button></div></header>
     {error && <div className="editor-alert error-alert">{error}</div>}{notice && <div className="editor-alert success-alert">{notice}</div>}
     {campaign && <section className="campaign-settings"><div><p className="overline">CAMPAÑA ACTIVA</p><h2>Cierre y arte central</h2><p>La selección está abierta desde ahora y cierra el martes 17 de noviembre a las 6:00 p. m. (hora Colombia). El plan se toma automáticamente de la ficha del estudiante.</p></div><div className="campaign-settings-fields"><label>Fecha y hora de cierre<input type="datetime-local" value={closesAt} onChange={(event) => setClosesAt(event.target.value)} /></label><label>Imagen central de la carpeta<input type="file" accept="image/*" onChange={(event) => setCenterFile(event.target.files?.[0] || null)} /><small>{centerFile?.name || (campaign.center_image_path ? 'Ya hay una imagen central cargada.' : 'Opcional; puedes agregarla cuando tengas el arte.')}</small></label><button className="gold-button" disabled={saving} onClick={saveCampaignSettings}>{saving ? 'Guardando…' : 'Guardar configuración'}</button></div></section>}
-    <div className="editor-layout"><aside className="editor-roster"><label>Filtrar por curso<select value={course} onChange={(event) => setCourse(event.target.value)}><option value="">Todos los cursos</option>{courses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Buscar por nombre<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre del estudiante" /></label><p className="roster-count">{filtered.length} estudiantes</p><div className="roster-list">{filtered.map((item) => <button key={item.id} className={`roster-item ${student?.id === item.id ? 'selected' : ''}`} onClick={() => selectStudent(item)}><b>{item.nombre}</b><span>{item.grado} · Plan {item.plan_id}</span></button>)}{!filtered.length && <p>No hay estudiantes con Plan 1 o Plan 2 en este curso.</p>}</div></aside>
+    <div className="editor-layout"><aside className="editor-roster"><label>Filtrar por curso<select value={course} onChange={(event) => setCourse(event.target.value)}><option value="">Todos los cursos</option>{courses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Buscar por nombre<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre del estudiante" /></label><p className="roster-count">{filtered.length} estudiantes</p><div className="roster-list">{filtered.map((item) => { const progress = photoProgress[item.id] || { folder: 0, retablo: 0 }; const complete = progress.folder === 5 && progress.retablo === 10; return <button key={item.id} className={`roster-item ${student?.id === item.id ? 'selected' : ''}`} onClick={() => selectStudent(item)}><b>{item.nombre}</b><span>{item.grado} · Plan {item.plan_id}</span><small className={`roster-photo-status ${complete ? 'complete' : ''}`}>{complete ? '✓ Fotos listas' : `${progress.folder + progress.retablo}/15 fotos`}</small></button> })}{!filtered.length && <p>No hay estudiantes con Plan 1 o Plan 2 en este curso.</p>}</div></aside>
       <section className="editor-workspace">{!student ? <div className="editor-empty"><h2>Selecciona un estudiante</h2><p>Plan 3 se excluye automáticamente. No necesitas asignar planes al cargar fotos.</p></div> : <>
         <div className="selected-student"><div><span>{student.grado} · Plan {student.plan_id}</span><h2>{student.nombre}</h2></div><div className="measure-list"><span>Carpeta · 20 × 30 cm vertical</span><span>Retablo · {student.plan_id === 1 ? '30 × 45' : '50 × 70'} cm vertical</span></div></div>
         {!campaign && <div className="editor-alert error-alert">No hay campaña configurada.</div>}

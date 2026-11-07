@@ -23,12 +23,14 @@ Para el login y la conexión real, copia `.env.example` a `.env` y agrega el Pro
 
 ## Activar el acceso estudiantil en Supabase
 
-1. Ejecuta `supabase/migrations/202611060005_student_portal.sql` en el SQL Editor del proyecto Supabase.
+1. Ejecuta `supabase/migrations/202611060005_student_portal.sql` y `supabase/migrations/202611070001_student_original_downloads.sql` en el SQL Editor del proyecto Supabase, en ese orden. Si `202611060005_student_portal.sql` ya se ejecutó, ejecuta solo la segunda.
 2. Instala/inicia sesión con Supabase CLI. Desde la raíz del repositorio, enlaza el proyecto con `supabase link --project-ref TU_PROJECT_REF`.
 3. Desde esa misma raíz, despliega la función con `supabase functions deploy student-login`.
 4. En el `.env` del frontend configura solo `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 
-Luego inicia sesión en el panel como editor. En la parte superior de `/editor/fotos`, la campaña queda sin fecha de apertura y el cierre aparece precargado al 17 de noviembre de 2026 a las 6:00 p. m. (Colombia); pulsa «Guardar configuración» para persistirlo. Allí también puedes cargar la imagen central que aparecerá en la carpeta.
+Luego inicia sesión en el panel como editor. En la parte superior de `/editor/fotos`, la campaña queda sin fecha de apertura y el cierre aparece precargado al 17 de noviembre de 2026 a las 6:00 p. m. (Colombia); pulsa «Guardar configuración» para persistirlo. Allí también puedes cargar la imagen central que aparecerá en la carpeta. Cada estudiante puede ampliar sus fotos y descargar los originales antes del cierre; el acceso se limita con RLS a su propia colección.
+
+El editor puede descargar un CSV con una fila por cada foto elegida: estudiante, curso, plan, producto, diseño, posición y ruta original. El nombre sugerido combina curso, el ID estable de `estudiantes` y el número global de la foto (carpeta 01–05, retablo 06–15); por ejemplo `1101-0009-06.jpg`. El esquema actual no tiene un código de estudiante secuencial dentro de cada curso, así que no inventamos uno.
 
 La clave `SUPABASE_SERVICE_ROLE_KEY` la proporciona Supabase a la Edge Function en el servidor; nunca se copia al navegador ni a Netlify.
 

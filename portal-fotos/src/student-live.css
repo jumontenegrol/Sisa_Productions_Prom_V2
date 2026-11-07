@@ -11,3 +11,75 @@
 @media(max-width:600px){.deadline-banner{font-size:11px;padding:10px}.student-state-card{padding:24px 18px}}
 .student-brand{width:160px;height:66px;overflow:hidden}
 @media(max-width:600px){.student-brand{width:140px;height:58px}}
+
+/* Student controls, countdown, full-screen zoom, and phone-first sizing. */
+.student-real-main .overline{font-size:12px}
+.student-real-main .welcome-copy,.student-real-main .section-heading p{font-size:16px}
+.student-real-main .section-heading h2{font-size:32px}
+.student-real-main .step-nav b{font-size:15px}
+.student-real-main .step-nav small{font-size:12px}
+.student-real-main .photo-choice-caption{font-size:13px}
+.student-real-main .counter,.student-real-main .size-chip{font-size:15px}
+.student-real-main .layout-icon.layout-2{width:48px;height:34px;grid-template-columns:1fr 1fr;grid-template-rows:1fr}
+.student-real-main .layout-preview-2{width:min(100%,420px);grid-template-columns:1fr 1fr;grid-template-rows:1fr;aspect-ratio:7/5}
+.student-real-main .layout-preview-2.layout-plan-1{aspect-ratio:3/2}
+.countdown-panel{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:18px 0 8px;padding:17px 20px;border:1px solid #5c5034;background:#211f1a}
+.countdown-panel>div:first-child{display:grid;gap:6px}
+.countdown-panel strong{color:#f1e7ce;font-size:16px}
+.countdown-panel span{color:#c0b69d;font-size:13px}
+.countdown-clock{display:flex;gap:8px}
+.countdown-clock>span{min-width:58px;padding:7px 8px;text-align:center;border:1px solid #544a35;background:#171719}
+.countdown-clock b,.countdown-clock small{display:block}
+.countdown-clock b{font-size:21px;color:var(--gold);font-variant-numeric:tabular-nums}
+.countdown-clock small{margin-top:2px;color:#aaa18b;font-size:10px}
+.download-reminder{margin:0 0 14px;padding:12px 16px;border-left:3px solid var(--gold);background:#222117;color:#e0d3b3;font-size:14px;line-height:1.5}
+.photo-choice-wrap{position:relative;min-width:0}
+.photo-choice-wrap>.photo-choice{width:100%;height:100%}
+.photo-choice-actions{position:absolute;right:7px;bottom:30px;display:flex;gap:5px}
+.photo-choice-actions button{width:34px;height:34px;border:1px solid #ffffff75;border-radius:50%;background:#111318dd;color:#f8f4eb;font-size:21px;line-height:1}
+.photo-choice-actions button:hover{border-color:var(--gold);color:var(--gold)}
+.photo-choice-actions button:disabled{opacity:.6}
+.photo-lightbox{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:#050609e8;backdrop-filter:blur(5px)}
+.photo-lightbox-card{width:min(100%,980px);max-height:94dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding:15px;border:1px solid #484950;background:#17181c;box-shadow:0 24px 90px #000a}
+.photo-lightbox-card>header,.photo-lightbox-card>footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.photo-lightbox-card>header>div{display:grid;gap:4px}
+.photo-lightbox-card>header b{font-size:16px;color:#f4f0e8}
+.photo-lightbox-card>header small{font-size:12px;color:var(--muted)}
+.photo-lightbox-card>img{width:100%;height:100%;min-height:0;max-height:calc(94dvh - 130px);object-fit:contain;background:#0c0d10}
+.lightbox-close{width:40px;height:40px;border:1px solid var(--line);background:#222329;color:#fff;font-size:28px;line-height:1}
+.lightbox-loading{position:fixed;z-index:1001;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 18px;border:1px solid var(--line);background:#191a1f;color:#f4f0e8}
+@media(max-width:850px){.student-real-main .five-grid,.student-real-main .retablo-pool-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.student-real-main .folder-workspace{grid-template-columns:minmax(0,1fr)}.student-real-main .retablo-workspace{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){
+  .student-real-main{padding:22px 14px 20px}
+  .student-real-main .welcome-row{gap:12px}
+  .student-real-main .welcome-row h1{font-size:36px}
+  .student-real-main .welcome-copy,.student-real-main .section-heading p{font-size:14px}
+  .student-real-main .section-heading h2{font-size:27px}
+  .student-real-main .overline{font-size:11px}
+  .student-real-main .plan-card{min-width:120px}
+  .student-real-main .plan-card small,.student-real-main .plan-card span{font-size:11px}
+  .student-real-main .step-nav{margin:20px 0 16px;padding:14px 10px}
+  .student-real-main .step-nav b{font-size:12px}
+  .student-real-main .step-nav small{font-size:10px}
+  .student-real-main .five-grid,.student-real-main .retablo-pool-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .student-real-main .photo-choice-caption{font-size:11px}
+  .student-real-main .photo-choice-actions{right:6px;bottom:27px;gap:4px}
+  .student-real-main .photo-choice-actions button{width:32px;height:32px;font-size:20px}
+  .countdown-panel{align-items:flex-start;flex-direction:column;gap:12px;padding:14px}
+  .countdown-panel strong{font-size:15px}
+  .countdown-panel span{font-size:12px;line-height:1.45}
+  .countdown-clock{width:100%;gap:5px}
+  .countdown-clock>span{flex:1;min-width:0;padding:7px 4px}
+  .countdown-clock b{font-size:19px}
+  .countdown-clock small{font-size:9px}
+  .download-reminder{font-size:13px;padding:11px 12px}
+  .student-real-main .selection-section{padding:19px 14px}
+  .student-real-main .section-footer{font-size:12px;gap:12px}
+  .student-real-main .primary-button,.student-real-main .text-button{font-size:13px}
+  .photo-lightbox{padding:8px}
+  .photo-lightbox-card{max-height:96dvh;padding:9px;gap:8px}
+  .photo-lightbox-card>img{max-height:calc(96dvh - 125px)}
+  .photo-lightbox-card>header b{font-size:14px}
+  .photo-lightbox-card>header small{font-size:11px}
+  .photo-lightbox-card .outline-button{min-height:44px;font-size:13px}
+}
