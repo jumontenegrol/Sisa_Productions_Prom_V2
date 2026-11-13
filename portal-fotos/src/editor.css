@@ -207,6 +207,7 @@
 .upload-group-heading p { margin: 6px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .upload-group-heading strong { color: var(--gold); font-size: 13px; white-space: nowrap; }
 .editor-thumbnails { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.unified-thumbnails { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .editor-thumb { min-width: 0; }
 .editor-thumb img,
 .editor-thumb > span {
@@ -263,7 +264,7 @@
   .editor-save-row { align-items: flex-start; flex-direction: column; }
   .editor-save-row p { max-width: none; }
   .editor-thumbnails { gap: 5px; }
-  .editor-thumbnails.ten-thumbs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .editor-thumbnails.ten-thumbs,.editor-thumbnails.unified-thumbnails { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .editor-thumb small { font-size: 9px; }
   .editor-login-card { padding: 27px 21px; }
 }

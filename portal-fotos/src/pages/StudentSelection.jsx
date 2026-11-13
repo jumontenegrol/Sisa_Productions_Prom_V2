@@ -16,8 +16,10 @@ export default function StudentSelection() {
   const [photos, setPhotos] = useState([])
   const [centerUrl, setCenterUrl] = useState('')
   const [folderIds, setFolderIds] = useState([])
+  const [folderRotations, setFolderRotations] = useState({})
   const [retabloLayout, setRetabloLayout] = useState(1)
   const [retabloIds, setRetabloIds] = useState([])
+  const [retabloRotations, setRetabloRotations] = useState({})
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -68,9 +70,11 @@ export default function StudentSelection() {
         const folder = current.filter((item) => item.product === 'folder').sort((a, b) => a.slot - b.slot)
         const retablo = current.filter((item) => item.product === 'retablo').sort((a, b) => a.slot - b.slot)
         setFolderIds(folder.map((item) => item.photo_id))
+        setFolderRotations(Object.fromEntries(folder.map((item) => [item.photo_id, item.rotation_degrees || 0])))
         if (retablo.length) {
           setRetabloLayout(retablo[0].layout)
           setRetabloIds(retablo.map((item) => item.photo_id))
+          setRetabloRotations(Object.fromEntries(retablo.map((item) => [item.photo_id, item.rotation_degrees || 0])))
           setStep(2)
         }
       }
@@ -93,8 +97,8 @@ export default function StudentSelection() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [zoomPhoto])
 
-  const folderPhotos = useMemo(() => photos.filter((photo) => photo.category === 'folder'), [photos])
-  const retabloPhotos = useMemo(() => photos.filter((photo) => photo.category === 'retablo'), [photos])
+  const folderPhotos = photos
+  const retabloPhotos = photos
   const availableLayouts = summary?.plan_id === 1 ? layouts.slice(0, 2) : layouts
   const currentLayout = availableLayouts.find((item) => item.id === retabloLayout) || availableLayouts[0]
   const retabloDimensions = retabloLayout === 2
@@ -110,14 +114,25 @@ export default function StudentSelection() {
     minutes: Math.floor((countdownMs % 3600000) / 60000),
     seconds: Math.floor((countdownMs % 60000) / 1000),
   }
-  const collectionReady = folderPhotos.length === 5 && retabloPhotos.length === 10
+  const collectionReady = photos.length >= 10 && photos.length <= 20
   const canSave = folderIds.length === 2 && retabloIds.length === currentLayout.count && !locked && collectionReady
 
-  function choose(items, setItems, photoId, limit) {
+  function choose(items, setItems, setRotations, photoId, limit) {
     setNotice(''); setError('')
-    setItems((previous) => previous.includes(photoId)
-      ? previous.filter((id) => id !== photoId)
-      : previous.length < limit ? [...previous, photoId] : previous)
+    if (items.includes(photoId)) {
+      setItems((previous) => previous.filter((id) => id !== photoId))
+      setRotations((previous) => {
+        const next = { ...previous }
+        delete next[photoId]
+        return next
+      })
+    } else if (items.length < limit) {
+      setItems((previous) => previous.includes(photoId) || previous.length >= limit ? previous : [...previous, photoId])
+    }
+  }
+
+  function rotatePhoto(photoId, setRotations) {
+    setRotations((previous) => ({ ...previous, [photoId]: ((previous[photoId] || 0) + 90) % 360 }))
   }
 
   function changeLayout(layoutId) {
@@ -144,7 +159,7 @@ export default function StudentSelection() {
     if (!photo?.original_path || locked) return
     setDownloadingId(photo.id); setError('')
     const extension = photo.original_path.split('.').pop() || 'jpg'
-    const photoNumber = photo.category === 'folder' ? photo.ordinal : photo.ordinal + 5
+    const photoNumber = photo.ordinal
     const studentCode = `${String(summary.grade || '').replace(/[^a-z0-9]/gi, '')}-${String(summary.student_id).padStart(4, '0')}`
     const filename = `${studentCode}-${String(photoNumber).padStart(2, '0')}.${extension}`
     const { data, error: downloadError } = await supabase.storage.from('student-originals').createSignedUrl(photo.original_path, 60, { download: filename })
@@ -156,11 +171,13 @@ export default function StudentSelection() {
   async function saveSelection() {
     if (!summary || !canSave) return
     setSaving(true); setError(''); setNotice('')
-    const { error: saveError } = await supabase.rpc('save_student_photo_selection', {
+    const { error: saveError } = await supabase.rpc('save_student_photo_selection_with_rotation', {
       p_campaign_id: summary.campaign_id,
       p_folder_photo_ids: folderIds,
       p_retablo_layout: retabloLayout,
       p_retablo_photo_ids: retabloIds,
+      p_folder_rotation_degrees: folderIds.map((id) => folderRotations[id] || 0),
+      p_retablo_rotation_degrees: retabloIds.map((id) => retabloRotations[id] || 0),
     })
     setSaving(false)
     if (saveError) { setError(saveError.message); return }
@@ -182,32 +199,32 @@ export default function StudentSelection() {
       {error && <div className="editor-alert error-alert">{error}</div>}{notice && <div className="saved-message">{notice}</div>}
 
       <nav className="step-nav" aria-label="Pasos de selección">
-        <button className={step === 1 ? 'active' : folderIds.length === 2 ? 'complete' : ''} onClick={() => setStep(1)}><span>01</span><b>Carpeta</b><small>Elige 2 de 5 fotos</small></button><div className="step-connector" />
+        <button className={step === 1 ? 'active' : folderIds.length === 2 ? 'complete' : ''} onClick={() => setStep(1)}><span>01</span><b>Carpeta</b><small>Elige 2 de tu colección</small></button><div className="step-connector" />
         <button className={step === 2 ? 'active' : retabloIds.length ? 'complete' : ''} onClick={() => folderIds.length === 2 && setStep(2)}><span>02</span><b>Retablo</b><small>Diseño y fotos</small></button>
       </nav>
 
-      {!collectionReady && <div className="editor-alert error-alert">Tu colección aún no está completa. El editor debe cargar las 5 fotos de carpeta y las 10 fotos de retablo.</div>}
+      {!collectionReady && <div className="editor-alert error-alert">Tu colección debe tener entre 10 y 20 fotos. Contacta al editor si aún no está completa.</div>}
       {step === 1 ? <section className="selection-section">
-        <div className="section-heading"><div><p className="overline">PRODUCTO 1 · CARPETA</p><h2>Selecciona 2 fotos</h2><p>Elige dos de tus cinco fotos. La imagen central ya viene incluida.</p></div><span className="counter">{folderIds.length} <small>/ 2 elegidas</small></span></div>
+        <div className="section-heading"><div><p className="overline">PRODUCTO 1 · CARPETA</p><h2>Selecciona 2 fotos</h2><p>Elige dos de tu colección. Puedes usar las mismas fotos también en el retablo.</p></div><span className="counter">{folderIds.length} <small>/ 2 elegidas</small></span></div>
         <div className="folder-workspace">
-          <div className="photo-grid five-grid">{folderPhotos.map((photo) => <PhotoChoice key={photo.id} photo={photo} selected={folderIds.includes(photo.id)} disabled={locked || (!folderIds.includes(photo.id) && folderIds.length === 2)} onClick={() => choose(folderIds, setFolderIds, photo.id, 2)} onZoom={() => openPhoto(photo)} onDownload={() => downloadPhoto(photo)} downloading={downloadingId === photo.id} locked={locked} />)}</div>
+          <div className="photo-grid folder-choice-grid">{folderPhotos.map((photo) => <PhotoChoice key={photo.id} photo={photo} selected={folderIds.includes(photo.id)} disabled={locked || (!folderIds.includes(photo.id) && folderIds.length === 2)} onClick={() => choose(folderIds, setFolderIds, setFolderRotations, photo.id, 2)} onZoom={() => openPhoto(photo)} onDownload={() => downloadPhoto(photo)} downloading={downloadingId === photo.id} locked={locked} />)}</div>
           <div className="live-preview-card"><div className="preview-card-heading"><div><strong>Así se verá tu carpeta</strong><span>3 cuadros · 20 × 30 cm cada uno</span></div><span className="live-pill">VISTA PREVIA</span></div>
-            <div className="folder-preview"><div className="preview-frame">{previewPhoto(folderPhotos, folderIds[0])}</div><div className="preview-frame center-frame">{centerUrl ? <img className="center-photo" src={centerUrl} alt="Imagen central de la carpeta" /> : <span className="center-art"><b>S</b><small>PROMOCIÓN</small></span>}</div><div className="preview-frame">{previewPhoto(folderPhotos, folderIds[1])}</div></div>
-            <div className="preview-caption"><span>Vertical · sin recorte manual</span><span>Vista previa real</span></div>
+            <div className="folder-preview"><div className="preview-frame">{previewPhoto(folderPhotos, folderIds[0], folderRotations[folderIds[0]] || 0, () => rotatePhoto(folderIds[0], setFolderRotations))}</div><div className="preview-frame center-frame">{centerUrl ? <img className="center-photo" src={centerUrl} alt="Imagen central de la carpeta" /> : <span className="center-art"><b>S</b><small>PROMOCIÓN</small></span>}</div><div className="preview-frame">{previewPhoto(folderPhotos, folderIds[1], folderRotations[folderIds[1]] || 0, () => rotatePhoto(folderIds[1], setFolderRotations))}</div></div>
+            <div className="preview-caption"><span>Usa ↻ para girar una foto en la vista previa</span><span>La orientación no va en el informe del editor</span></div>
           </div>
         </div>
         <div className="section-footer"><span>{folderIds.length === 2 ? 'Ya elegiste tus dos fotos.' : `Te faltan ${2 - folderIds.length} fotos.`}</span><button className="primary-button" disabled={folderIds.length !== 2} onClick={() => setStep(2)}>Continuar al retablo <span>→</span></button></div>
       </section> : <section className="selection-section">
-        <div className="section-heading"><div><p className="overline">PRODUCTO 2 · RETABLO</p><h2>Escoge tu composición</h2><p>Elige un diseño y completa sus espacios con fotos distintas.</p></div><span className="size-chip">{retabloDimensions}</span></div>
+        <div className="section-heading"><div><p className="overline">PRODUCTO 2 · RETABLO</p><h2>Escoge tu composición</h2><p>Elige un diseño y completa sus espacios. No repitas una foto dentro del retablo.</p></div><span className="size-chip">{retabloDimensions}</span></div>
         <div className="layout-options">{availableLayouts.map((layout) => <button key={layout.id} disabled={locked} className={`layout-option ${retabloLayout === layout.id ? 'selected' : ''}`} onClick={() => changeLayout(layout.id)}><span className={`layout-icon layout-${layout.id}`}><i /><i /><i /><i /></span><span><b>Opción {layout.id}</b><small>{layout.title} · {layout.desc}</small></span><span className="radio-dot" /></button>)}</div>
-        <div className="retablo-workspace"><div className="retablo-photo-pool"><div className="pool-heading"><b>Elige {currentLayout.count} {currentLayout.count === 1 ? 'foto' : 'fotos'}</b><span>{retabloIds.length}/{currentLayout.count}</span></div><div className="photo-grid retablo-pool-grid">{retabloPhotos.map((photo) => <PhotoChoice key={photo.id} photo={photo} selected={retabloIds.includes(photo.id)} disabled={locked || (!retabloIds.includes(photo.id) && retabloIds.length === currentLayout.count)} onClick={() => choose(retabloIds, setRetabloIds, photo.id, currentLayout.count)} onZoom={() => openPhoto(photo)} onDownload={() => downloadPhoto(photo)} downloading={downloadingId === photo.id} locked={locked} />)}</div></div>
-          <div className="live-preview-card retablo-preview-card"><div className="preview-card-heading"><div><strong>Vista previa del retablo</strong><span>Opción {retabloLayout} · {retabloDimensions}</span></div><span className="live-pill">VISTA PREVIA</span></div><div className={`retablo-preview layout-preview-${currentLayout.count} ${retabloLayout === 2 ? `layout-plan-${summary.plan_id}` : ''}`}>{Array.from({ length: currentLayout.count }, (_, index) => <div className="retablo-preview-frame" key={index}>{previewPhoto(retabloPhotos, retabloIds[index]) || <span className="empty-frame">Foto {index + 1}</span>}</div>)}</div><div className="preview-caption"><span>Sin repetir fotos de la carpeta</span><span>Vista previa real</span></div></div>
+        <div className="retablo-workspace"><div className="retablo-photo-pool"><div className="pool-heading"><b>Elige {currentLayout.count} {currentLayout.count === 1 ? 'foto' : 'fotos'} de tu colección</b><span>{retabloIds.length}/{currentLayout.count}</span></div><div className="photo-grid retablo-pool-grid">{retabloPhotos.map((photo) => <PhotoChoice key={photo.id} photo={photo} selected={retabloIds.includes(photo.id)} disabled={locked || (!retabloIds.includes(photo.id) && retabloIds.length === currentLayout.count)} onClick={() => choose(retabloIds, setRetabloIds, setRetabloRotations, photo.id, currentLayout.count)} onZoom={() => openPhoto(photo)} onDownload={() => downloadPhoto(photo)} downloading={downloadingId === photo.id} locked={locked} />)}</div></div>
+          <div className="live-preview-card retablo-preview-card"><div className="preview-card-heading"><div><strong>Vista previa del retablo</strong><span>Opción {retabloLayout} · {retabloDimensions}</span></div><span className="live-pill">VISTA PREVIA</span></div><div className={`retablo-preview layout-preview-${currentLayout.count} ${retabloLayout === 2 ? `layout-plan-${summary.plan_id}` : ''}`}>{Array.from({ length: currentLayout.count }, (_, index) => <div className="retablo-preview-frame" key={index}>{previewPhoto(retabloPhotos, retabloIds[index], retabloRotations[retabloIds[index]] || 0, () => rotatePhoto(retabloIds[index], setRetabloRotations)) || <span className="empty-frame">Foto {index + 1}</span>}</div>)}</div><div className="preview-caption"><span>Gira las fotos desde la vista previa si lo necesitas</span><span>La misma foto puede usarse en ambas elecciones</span></div></div>
         </div>
         <div className="section-footer"><button className="text-button" onClick={() => setStep(1)}>← Volver a carpeta</button><button className="primary-button" disabled={!canSave || saving} onClick={saveSelection}>{saving ? 'Guardando…' : 'Guardar selección'} <span>✓</span></button></div>
       </section>}
       <footer className="portal-footer"><span>Tu selección y tus fotos son privadas.</span><span>¿Necesitas ayuda? Contacta al editor.</span></footer>
     </main>
-    {zoomPhoto && <div className="photo-lightbox" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setZoomPhoto(null) }}><section className="photo-lightbox-card" role="dialog" aria-modal="true" aria-label={`Foto ${zoomPhoto.ordinal} ampliada`}><header><div><b>{zoomPhoto.category === 'folder' ? 'Carpeta' : 'Retablo'} · Foto {String(zoomPhoto.ordinal).padStart(2, '0')}</b><small>{zoomPhoto.zoomIsPreview ? 'Vista ampliada de la vista previa' : 'Vista ampliada de tu foto original'}</small></div><button className="lightbox-close" type="button" onClick={() => setZoomPhoto(null)} aria-label="Cerrar foto ampliada">×</button></header><img src={zoomPhoto.zoomUrl} alt={`Foto ${zoomPhoto.ordinal} ampliada`} /><footer><button className="outline-button" type="button" onClick={() => downloadPhoto(zoomPhoto)} disabled={locked || downloadingId === zoomPhoto.id}>{downloadingId === zoomPhoto.id ? 'Preparando…' : 'Descargar original'}</button></footer></section></div>}
+    {zoomPhoto && <div className="photo-lightbox" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setZoomPhoto(null) }}><section className="photo-lightbox-card" role="dialog" aria-modal="true" aria-label={`Foto ${zoomPhoto.ordinal} ampliada`}><header><div><b>Foto {String(zoomPhoto.ordinal).padStart(2, '0')}</b><small>{zoomPhoto.zoomIsPreview ? 'Vista ampliada de la vista previa' : 'Vista ampliada de tu foto original'}</small></div><button className="lightbox-close" type="button" onClick={() => setZoomPhoto(null)} aria-label="Cerrar foto ampliada">×</button></header><img src={zoomPhoto.zoomUrl} alt={`Foto ${zoomPhoto.ordinal} ampliada`} /><footer><button className="outline-button" type="button" onClick={() => downloadPhoto(zoomPhoto)} disabled={locked || downloadingId === zoomPhoto.id}>{downloadingId === zoomPhoto.id ? 'Preparando…' : 'Descargar original'}</button></footer></section></div>}
     {zoomBusy && <div className="lightbox-loading" role="status">Abriendo foto…</div>}
   </div>
 }
@@ -216,7 +233,7 @@ function PhotoChoice({ photo, selected, disabled, onClick, onZoom, onDownload, d
   return <div className="photo-choice-wrap"><button type="button" className={`photo-choice ${selected ? 'is-selected' : ''}`} disabled={disabled} onClick={onClick}><img className="real-photo" src={photo.url} alt={`Foto ${photo.ordinal}`} /><span className="photo-choice-caption">Foto {String(photo.ordinal).padStart(2, '0')}</span>{selected && <span className="selected-mark">✓</span>}</button><div className="photo-choice-actions"><button type="button" aria-label={`Ampliar foto ${photo.ordinal}`} title="Ampliar" disabled={!photo.url} onClick={onZoom}>⤢</button><button type="button" aria-label={`Descargar foto ${photo.ordinal}`} title={locked ? 'Descargas cerradas' : 'Descargar original'} disabled={downloading || locked || !photo.original_path} onClick={onDownload}>{downloading ? '…' : '↓'}</button></div></div>
 }
 
-function previewPhoto(photos, id) {
+function previewPhoto(photos, id, rotation = 0, onRotate) {
   const photo = photos.find((item) => item.id === id)
-  return photo?.url ? <img className="selected-preview-photo" src={photo.url} alt={`Foto ${photo.ordinal}`} /> : <span className="empty-frame">Tu foto</span>
+  return photo?.url ? <div className="rotatable-preview"><img className={`selected-preview-photo ${rotation % 180 ? 'is-quarter-turned' : ''}`} src={photo.url} alt={`Foto ${photo.ordinal}`} style={{ '--photo-rotation': `${rotation}deg`, transform: rotation % 180 ? undefined : `rotate(${rotation}deg)` }} /><button type="button" className="rotate-preview-button" aria-label={`Girar foto ${photo.ordinal} 90 grados`} title="Girar 90° en la vista previa" onClick={onRotate}>↻</button></div> : <span className="empty-frame">Tu foto</span>
 }

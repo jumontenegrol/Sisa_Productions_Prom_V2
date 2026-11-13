@@ -20,10 +20,7 @@ function toLocalDateTime(value) {
 function photoProgressFromRows(rows = []) {
   const result = {}
   for (const row of rows) {
-    const key = row.student_id
-    result[key] ||= { folder: 0, retablo: 0 }
-    if (row.category === 'folder') result[key].folder += 1
-    if (row.category === 'retablo') result[key].retablo += 1
+    result[row.student_id] = (result[row.student_id] || 0) + 1
   }
   return result
 }
@@ -62,8 +59,7 @@ export default function PhotoEditor() {
   const [search, setSearch] = useState('')
   const [course, setCourse] = useState('')
   const [photos, setPhotos] = useState([])
-  const [folderFiles, setFolderFiles] = useState([])
-  const [retabloFiles, setRetabloFiles] = useState([])
+  const [collectionFiles, setCollectionFiles] = useState([])
   const [closesAt, setClosesAt] = useState('')
   const [centerFile, setCenterFile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -85,7 +81,7 @@ export default function PhotoEditor() {
       setStudents(studentResult.data || [])
       if (campaignResult.data?.[0]) {
         const { data: photoRows, error: photoRowsError } = await supabase.from('student_photos')
-          .select('student_id,category,ordinal')
+          .select('student_id,ordinal')
           .eq('campaign_id', campaignResult.data[0].id)
         if (photoRowsError) setError(photoRowsError.message)
         setPhotoProgress(photoProgressFromRows(photoRows || []))
@@ -122,7 +118,7 @@ export default function PhotoEditor() {
   const courses = useMemo(() => [...new Set(students.map((item) => item.grado).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })), [students])
 
   function selectStudent(item) {
-    setStudent(item); setFolderFiles([]); setRetabloFiles([]); setNotice(''); setError('')
+    setStudent(item); setCollectionFiles([]); setNotice(''); setError('')
   }
 
   function byFilename(files) {
@@ -179,7 +175,7 @@ export default function PhotoEditor() {
         const person = studentById.get(selection.student_id)
         const photo = photoById.get(selection.photo_id)
         if (!person || !photo) return null
-        const globalNumber = photo.category === 'folder' ? photo.ordinal : photo.ordinal + 5
+        const globalNumber = photo.ordinal
         const studentCode = `${String(person.grado || 'SINCURSO').replace(/[^a-z0-9]/gi, '')}-${String(person.id).padStart(4, '0')}`
         const extension = photo.original_path?.split('.').pop()?.toLowerCase() || 'jpg'
         const dimensions = selection.product === 'folder'
@@ -205,18 +201,32 @@ export default function PhotoEditor() {
     } finally { setReporting(false) }
   }
 
-  async function uploadGroup(category, files, count) {
+  async function uploadCollection(files) {
     const ordered = byFilename(files)
+    if (ordered.length < 10 || ordered.length > 20) throw new Error('Selecciona entre 10 y 20 fotos para la colección.')
+
+    const photosToRemove = photos.filter((photo) => photo.ordinal > ordered.length)
+    if (photosToRemove.length) {
+      const { data: selections, error: selectionError } = await supabase.from('photo_selections')
+        .select('photo_id').eq('student_id', student.id).eq('campaign_id', campaign.id)
+      if (selectionError) throw selectionError
+      const selectedIds = new Set((selections || []).map((selection) => selection.photo_id))
+      const selectedToRemove = photosToRemove.filter((photo) => selectedIds.has(photo.id))
+      if (selectedToRemove.length) {
+        throw new Error('No se puede reducir la colección porque algunas fotos sobrantes ya están elegidas. Pide al estudiante que actualice su selección antes de quitar esas fotos.')
+      }
+    }
+
     for (let i = 0; i < ordered.length; i += 1) {
       const file = ordered[i]
       const ext = extOf(file)
       if (!ext || !file.type.startsWith('image/')) throw new Error(`${file.name}: usa JPG, PNG o WebP.`)
       if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name}: el máximo es 10 MB.`)
       const ordinal = i + 1
-      const stem = `${campaign.id}/${student.id}/${category}/${String(ordinal).padStart(2, '0')}`
+      const stem = `${campaign.id}/${student.id}/collection/${String(ordinal).padStart(2, '0')}`
       const originalPath = `${stem}.${ext}`
       const previewPath = `${stem}.webp`
-      const prior = photos.find((photo) => photo.category === category && photo.ordinal === ordinal)
+      const prior = photos.find((photo) => photo.ordinal === ordinal)
       const preview = await previewFile(file)
       const [{ error: originalError }, { error: previewError }] = await Promise.all([
         supabase.storage.from('student-originals').upload(originalPath, file, { upsert: true, contentType: file.type }),
@@ -225,29 +235,42 @@ export default function PhotoEditor() {
       if (originalError) throw originalError
       if (previewError) throw previewError
       const { error: rowError } = await supabase.from('student_photos').upsert({
-        student_id: student.id, campaign_id: campaign.id, category, ordinal,
+        student_id: student.id, campaign_id: campaign.id, category: 'collection', ordinal,
         original_path: originalPath, preview_path: previewPath,
         width_px: preview.width, height_px: preview.height,
-      }, { onConflict: 'student_id,campaign_id,category,ordinal' })
+      }, { onConflict: 'student_id,campaign_id,ordinal' })
       if (rowError) throw rowError
-      if (prior?.original_path && prior.original_path !== originalPath) await supabase.storage.from('student-originals').remove([prior.original_path])
+      if (prior?.original_path && prior.original_path !== originalPath) {
+        await supabase.storage.from('student-originals').remove([prior.original_path])
+      }
+      if (prior?.preview_path && prior.preview_path !== previewPath) {
+        await supabase.storage.from('student-previews').remove([prior.preview_path])
+      }
     }
-    if (ordered.length !== count) throw new Error(`Debes seleccionar exactamente ${count} fotos.`)
+
+    if (photosToRemove.length) {
+      const removeIds = photosToRemove.map((photo) => photo.id)
+      const { error: removeRowsError } = await supabase.from('student_photos').delete().in('id', removeIds)
+      if (removeRowsError) throw removeRowsError
+      await Promise.all([
+        supabase.storage.from('student-originals').remove(photosToRemove.map((photo) => photo.original_path)),
+        supabase.storage.from('student-previews').remove(photosToRemove.map((photo) => photo.preview_path)),
+      ])
+    }
   }
 
   async function save() {
-    if (folderFiles.length !== 5 || retabloFiles.length !== 10) { setError('Selecciona exactamente 5 fotos de carpeta y 10 fotos de retablo.'); return }
+    if (collectionFiles.length < 10 || collectionFiles.length > 20) { setError('Selecciona entre 10 y 20 fotos para la colección.'); return }
     setSaving(true); setError(''); setNotice('')
     try {
-      await uploadGroup('folder', folderFiles, 5)
-      await uploadGroup('retablo', retabloFiles, 10)
-      setNotice(`Se guardaron las 15 fotos de ${student.nombre}. El plan ${student.plan_id} se tomó automáticamente de la base de datos.`)
-      setFolderFiles([]); setRetabloFiles([])
+      await uploadCollection(collectionFiles)
+      setNotice(`Se guardaron ${collectionFiles.length} fotos de ${student.nombre}. El plan ${student.plan_id} se tomó automáticamente de la base de datos.`)
+      setCollectionFiles([])
       const { data } = await supabase.from('student_photos').select('id,student_id,category,ordinal,original_path,preview_path,width_px,height_px').eq('student_id', student.id).eq('campaign_id', campaign.id).order('ordinal')
       if (data?.length) {
         const { data: signed } = await supabase.storage.from('student-previews').createSignedUrls(data.map((item) => item.preview_path), 1800)
         setPhotos(data.map((item, index) => ({ ...item, signedUrl: signed?.[index]?.signedUrl || '' })))
-        setPhotoProgress((current) => ({ ...current, [student.id]: photoProgressFromRows(data)[student.id] || { folder: 0, retablo: 0 } }))
+        setPhotoProgress((current) => ({ ...current, [student.id]: photoProgressFromRows(data)[student.id] || 0 }))
       }
     } catch (saveError) {
       setError(`Carga incompleta: ${saveError.message}. Puedes volver a guardar; los archivos se actualizan por posición.`)
@@ -259,19 +282,18 @@ export default function PhotoEditor() {
     <header className="editor-topbar"><div className="editor-heading-brand"><BrandLogo variant="header" /><div><p className="overline">PORTAL INDEPENDIENTE</p><h1>Editor de fotografías</h1><p>Los planes se leen automáticamente desde la ficha existente del estudiante.</p></div></div><div className="top-actions"><button className="outline-button" disabled={!campaign || reporting} onClick={exportSelectionReport}>{reporting ? 'Generando informe…' : 'Descargar informe CSV'}</button><Link to="/" className="outline-button">Inicio</Link><button className="outline-button" onClick={signOut}>Salir</button></div></header>
     {error && <div className="editor-alert error-alert">{error}</div>}{notice && <div className="editor-alert success-alert">{notice}</div>}
     {campaign && <section className="campaign-settings"><div><p className="overline">CAMPAÑA ACTIVA</p><h2>Cierre y arte central</h2><p>La selección está abierta desde ahora y cierra el martes 17 de noviembre a las 6:00 p. m. (hora Colombia). El plan se toma automáticamente de la ficha del estudiante.</p></div><div className="campaign-settings-fields"><label>Fecha y hora de cierre<input type="datetime-local" value={closesAt} onChange={(event) => setClosesAt(event.target.value)} /></label><label>Imagen central de la carpeta<input type="file" accept="image/*" onChange={(event) => setCenterFile(event.target.files?.[0] || null)} /><small>{centerFile?.name || (campaign.center_image_path ? 'Ya hay una imagen central cargada.' : 'Opcional; puedes agregarla cuando tengas el arte.')}</small></label><button className="gold-button" disabled={saving} onClick={saveCampaignSettings}>{saving ? 'Guardando…' : 'Guardar configuración'}</button></div></section>}
-    <div className="editor-layout"><aside className="editor-roster"><label>Filtrar por curso<select value={course} onChange={(event) => setCourse(event.target.value)}><option value="">Todos los cursos</option>{courses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Buscar por nombre<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre del estudiante" /></label><p className="roster-count">{filtered.length} estudiantes</p><div className="roster-list">{filtered.map((item) => { const progress = photoProgress[item.id] || { folder: 0, retablo: 0 }; const complete = progress.folder === 5 && progress.retablo === 10; return <button key={item.id} className={`roster-item ${student?.id === item.id ? 'selected' : ''}`} onClick={() => selectStudent(item)}><b>{item.nombre}</b><span>{item.grado} · Plan {item.plan_id}</span><small className={`roster-photo-status ${complete ? 'complete' : ''}`}>{complete ? '✓ Fotos listas' : `${progress.folder + progress.retablo}/15 fotos`}</small></button> })}{!filtered.length && <p>No hay estudiantes con Plan 1 o Plan 2 en este curso.</p>}</div></aside>
+    <div className="editor-layout"><aside className="editor-roster"><label>Filtrar por curso<select value={course} onChange={(event) => setCourse(event.target.value)}><option value="">Todos los cursos</option>{courses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Buscar por nombre<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre del estudiante" /></label><p className="roster-count">{filtered.length} estudiantes</p><div className="roster-list">{filtered.map((item) => { const progress = photoProgress[item.id] || 0; const complete = progress >= 10 && progress <= 20; return <button key={item.id} className={`roster-item ${student?.id === item.id ? 'selected' : ''}`} onClick={() => selectStudent(item)}><b>{item.nombre}</b><span>{item.grado} · Plan {item.plan_id}</span><small className={`roster-photo-status ${complete ? 'complete' : ''}`}>{complete ? `✓ ${progress} fotos listas` : `${progress}/10–20 fotos`}</small></button> })}{!filtered.length && <p>No hay estudiantes con Plan 1 o Plan 2 en este curso.</p>}</div></aside>
       <section className="editor-workspace">{!student ? <div className="editor-empty"><h2>Selecciona un estudiante</h2><p>Plan 3 se excluye automáticamente. No necesitas asignar planes al cargar fotos.</p></div> : <>
-        <div className="selected-student"><div><span>{student.grado} · Plan {student.plan_id}</span><h2>{student.nombre}</h2></div><div className="measure-list"><span>Carpeta · 20 × 30 cm vertical</span><span>Retablo · {student.plan_id === 1 ? '30 × 45' : '50 × 70'} cm vertical</span></div></div>
+        <div className="selected-student"><div><span>{student.grado} · Plan {student.plan_id}</span><h2>{student.nombre}</h2></div><div className="measure-list"><span>Colección compartida · 10 a 20 fotos</span><span>Carpeta · 20 × 30 cm · Retablo · {student.plan_id === 1 ? '30 × 45' : '50 × 70'} cm</span></div></div>
         {!campaign && <div className="editor-alert error-alert">No hay campaña configurada.</div>}
-        <PhotoGroup title="Fotos para carpeta" category="folder" count={5} files={folderFiles} setFiles={setFolderFiles} current={photos} />
-        <PhotoGroup title="Fotos para retablo" category="retablo" count={10} files={retabloFiles} setFiles={setRetabloFiles} current={photos} />
-        <div className="editor-save-row"><p>Los archivos se ordenan por nombre. Nombra cada serie como 01, 02, 03…</p><button className="gold-button" disabled={!campaign || saving || folderFiles.length !== 5 || retabloFiles.length !== 10} onClick={save}>{saving ? 'Subiendo fotos…' : 'Guardar 15 fotos'}</button></div>
+        <PhotoCollection files={collectionFiles} setFiles={setCollectionFiles} current={photos} />
+        <div className="editor-save-row"><p>La misma colección estará disponible para ambas elecciones. Los archivos se ordenan por nombre.</p><button className="gold-button" disabled={!campaign || saving || collectionFiles.length < 10 || collectionFiles.length > 20} onClick={save}>{saving ? 'Subiendo fotos…' : `Guardar ${collectionFiles.length || ''} fotos`}</button></div>
       </>}</section>
     </div>
   </main>
 }
 
-function PhotoGroup({ title, category, count, files, setFiles, current }) {
-  const existing = current.filter((item) => item.category === category)
-  return <section className="upload-group"><div className="upload-group-heading"><div><h3>{title}</h3><p>Sube exactamente {count} imágenes. JPG, PNG o WebP; máximo 10 MB cada una.</p></div><strong>{existing.length}/{count} guardadas</strong></div><div className={`editor-thumbnails ${count === 10 ? 'ten-thumbs' : ''}`}>{Array.from({ length: count }, (_, index) => { const photo = existing.find((item) => item.ordinal === index + 1); return <div className="editor-thumb" key={index}>{photo?.signedUrl ? <img src={photo.signedUrl} alt={`${title} ${index + 1}`} /> : <span>{String(index + 1).padStart(2, '0')}</span>}<small>{category === 'folder' ? 'Carpeta' : 'Retablo'} {index + 1}</small></div> })}</div><label className="select-files">Seleccionar {count} fotos<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles(Array.from(event.target.files || []))} />{files.length > 0 && <small>{files.length} seleccionadas: {files.map((file) => file.name).sort((a,b) => a.localeCompare(b, 'es', {numeric:true})).join(', ')}</small>}</label></section>
+function PhotoCollection({ files, setFiles, current }) {
+  const orderedCurrent = [...current].sort((a, b) => a.ordinal - b.ordinal)
+  return <section className="upload-group"><div className="upload-group-heading"><div><h3>Colección de fotos</h3><p>Sube de 10 a 20 imágenes. JPG, PNG o WebP; máximo 10 MB cada una. Se aceptan fotos verticales y horizontales.</p></div><strong>{orderedCurrent.length}/20 guardadas</strong></div><div className="editor-thumbnails unified-thumbnails">{orderedCurrent.map((photo) => <div className="editor-thumb" key={photo.id}>{photo.signedUrl ? <img src={photo.signedUrl} alt={`Foto ${photo.ordinal}`} /> : <span>{String(photo.ordinal).padStart(2, '0')}</span>}<small>Foto {String(photo.ordinal).padStart(2, '0')}</small></div>)}</div><label className="select-files">Seleccionar entre 10 y 20 fotos<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles(Array.from(event.target.files || []))} />{files.length > 0 && <small>{files.length} seleccionadas: {files.map((file) => file.name).sort((a,b) => a.localeCompare(b, 'es', {numeric:true})).join(', ')}</small>}</label></section>
 }

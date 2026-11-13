@@ -1,5 +1,10 @@
 .photo-choice .real-photo{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:#25262b}
 .selected-preview-photo{display:block;width:100%;height:100%;object-fit:cover}
+.rotatable-preview{position:relative;width:100%;height:100%;overflow:hidden;container-type:size}
+.rotatable-preview .selected-preview-photo{transition:transform .2s ease}
+.rotatable-preview .selected-preview-photo.is-quarter-turned{position:absolute;top:50%;left:50%;width:100cqh;height:100cqw;max-width:none;transform:translate(-50%,-50%) rotate(var(--photo-rotation));}
+.rotate-preview-button{position:absolute;right:5px;bottom:5px;width:34px;height:34px;border:1px solid #ffffff75;border-radius:50%;background:#111318dd;color:#f8f4eb;font-size:23px;line-height:1;z-index:2}
+.rotate-preview-button:hover{border-color:var(--gold);color:var(--gold)}
 .center-photo{display:block;width:100%;height:100%;object-fit:contain;background:#17181b}
 .deadline-banner{margin:12px 0;padding:12px 15px;border:1px solid #655838;background:#29251c;color:#dfd1ad;font-size:13px;line-height:1.5}
 .locked-banner{border-color:#594647;background:#281f20;color:#e2bcb7}
@@ -48,7 +53,7 @@
 .photo-lightbox-card>img{width:100%;height:100%;min-height:0;max-height:calc(94dvh - 130px);object-fit:contain;background:#0c0d10}
 .lightbox-close{width:40px;height:40px;border:1px solid var(--line);background:#222329;color:#fff;font-size:28px;line-height:1}
 .lightbox-loading{position:fixed;z-index:1001;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 18px;border:1px solid var(--line);background:#191a1f;color:#f4f0e8}
-@media(max-width:850px){.student-real-main .five-grid,.student-real-main .retablo-pool-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.student-real-main .folder-workspace{grid-template-columns:minmax(0,1fr)}.student-real-main .retablo-workspace{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:850px){.student-real-main .folder-choice-grid,.student-real-main .retablo-pool-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.student-real-main .folder-workspace{grid-template-columns:minmax(0,1fr)}.student-real-main .retablo-workspace{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){
   .student-real-main{padding:22px 14px 20px}
   .student-real-main .welcome-row{gap:12px}
@@ -61,7 +66,8 @@
   .student-real-main .step-nav{margin:20px 0 16px;padding:14px 10px}
   .student-real-main .step-nav b{font-size:12px}
   .student-real-main .step-nav small{font-size:10px}
-  .student-real-main .five-grid,.student-real-main .retablo-pool-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .student-real-main .folder-choice-grid,.student-real-main .retablo-pool-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .student-real-main .retablo-preview-frame .rotate-preview-button,.student-real-main .preview-frame .rotate-preview-button{width:30px;height:30px;font-size:20px}
   .student-real-main .photo-choice-caption{font-size:11px}
   .student-real-main .photo-choice-actions{right:6px;bottom:27px;gap:4px}
   .student-real-main .photo-choice-actions button{width:32px;height:32px;font-size:20px}
